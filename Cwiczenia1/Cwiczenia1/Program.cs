@@ -10,8 +10,7 @@ namespace Cwiczenia1
         public static async Task Main(string[] args)
         { 
             var httpClient = new HttpClient();
-            //var respose = await httpClient.GetAsync("https://pja.edu.pl");
-            var respose = await httpClient.GetAsync(args[0]);
+            var respose = await httpClient.GetAsync("https://pja.edu.pl");
 
             //JS Promise async/await
             //Java Future
