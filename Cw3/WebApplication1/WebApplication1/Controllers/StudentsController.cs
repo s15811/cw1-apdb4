@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Cw3.Models;
 using Cw3.DAL;
+using System.Data.SqlClient;
 
 namespace Cw3.Controllers
 {
@@ -14,6 +15,8 @@ namespace Cw3.Controllers
     public class StudentsController : ControllerBase
     {
         private readonly IDbService _dbService;
+        public static List<Student> _students;
+        public static List<Student> _semestry;
 
         public StudentsController(IDbService dbService)
         {
@@ -21,25 +24,89 @@ namespace Cw3.Controllers
         }
 
         [HttpGet]
-        public IActionResult GetStudents(string orderBy)
+        public IActionResult GetStudents(string index)
         {
-            return Ok(_dbService.GetStudents());
+            string indexNumber = index;
+
+            using (var client = new SqlConnection("Data Source = db-mssql; Initial Catalog = s15811; Integrated Security = True"))
+            using (var con = new SqlCommand())
+            {
+                con.Connection = client;
+                con.CommandText = "Select * FROM Student WHERE IndexNumber = @indexNumber";
+                con.Parameters.AddWithValue("indexNumber", indexNumber);
+
+                client.Open();
+                var dr = con.ExecuteReader();
+                int id = 1;
+                _students = new List<Student>();
+
+                while (dr.Read())
+                {
+                    var st = new Student();
+                    st.FirstName = dr["FirstName"].ToString();
+                    st.LastName = dr["LastName"].ToString();
+                    st.IndexNumber = dr["IndexNumber"].ToString();
+                    st.BirthDate = (DateTime)dr["BirthDate"];
+                    st.IdEnrollment = (int)dr["IdEnrollment"];
+                    st.IdStudent = id;
+
+                    _students.Add(st);
+                    id++;
+                }
+                return Ok(_dbService.GetStudents());
+            }
+
+
         }
 
         [HttpGet("{id}")]
         public IActionResult GetStudent(int id)
         {
-            if(id == 1)
+            int idStudenta = id;
+            listaStudentow();
+
+            string index = null;
+            for (int i = 0; i < _students.Count; i++)
             {
-                return Ok("Kowalski");
-            }
-            else if (id == 2)
-            {
-                return Ok("Malewski");
+                if (_students[i].IdStudent.Equals(idStudenta))
+                {
+                    index = _students[i].IndexNumber;
+                    break;
+                }
             }
 
-            return NotFound("Nie znaleziono studenta");
+            if (index != null)
+            {
+                using (var client = new SqlConnection("Data Source = db-mssql; Initial Catalog = s15811; Integrated Security = True"))
+                using (var con = new SqlCommand())
+                {
+                    con.Connection = client;
+                    con.CommandText = "Select * FROM Student, Enrollment WHERE Student.IdEnrollment=Enrollment.IdEnrollment AND Student.IndexNumber=@index";
+                    con.Parameters.AddWithValue("index", index);
+
+                    client.Open();
+                    var dr = con.ExecuteReader();
+
+                    List<String> _semestry = new List<String>();
+
+                    while (dr.Read())
+                    {
+                        var st = "IdEnrollment ";
+                        st += dr["IdEnrollment"].ToString();
+                        st += " Semester ";
+                        st += dr["Semester"].ToString();
+
+                        _semestry.Add(st);
+                    }
+                    return Ok(_semestry);
+                }
+            }
+            else
+            {
+                return Ok("Nie znaleziono studenta");
+            }
         }
+
         [HttpPost]
         public IActionResult CreateStudent(Student student)
         {
@@ -59,6 +126,37 @@ namespace Cw3.Controllers
         public IActionResult DeleteStudent(Student student)
         {
             return Ok("Usuwanie ukończone");
+        }
+
+
+
+        public void listaStudentow()
+        {
+            using (var client = new SqlConnection("Data Source = db-mssql; Initial Catalog = s15811; Integrated Security = True"))
+            using (var con = new SqlCommand())
+            {
+                con.Connection = client;
+                con.CommandText = "Select * FROM Student";
+
+                client.Open();
+                var dr = con.ExecuteReader();
+                int id = 1;
+                _students = new List<Student>();
+
+                while (dr.Read())
+                {
+                    var st = new Student();
+                    st.FirstName = dr["FirstName"].ToString();
+                    st.LastName = dr["LastName"].ToString();
+                    st.IndexNumber = dr["IndexNumber"].ToString();
+                    st.BirthDate = (DateTime)dr["BirthDate"];
+                    st.IdEnrollment = (int)dr["IdEnrollment"];
+                    st.IdStudent = id;
+
+                    _students.Add(st);
+                    id++;
+                }
+            }
         }
     }
 }
