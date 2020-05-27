@@ -98,6 +98,7 @@ namespace Cw3.Controllers
 
                         _semestry.Add(st);
                     }
+                    client.Close();
                     return Ok(_semestry);
                 }
             }
@@ -156,6 +157,7 @@ namespace Cw3.Controllers
                     _students.Add(st);
                     id++;
                 }
+                client.Close();
             }
         }
     }
