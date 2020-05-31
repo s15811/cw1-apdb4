@@ -1,5 +1,6 @@
 ﻿using Cw3.DTOs.Requests;
 using Cw3.Models;
+using System.Collections.Generic;
 using System.Data.SqlClient;
 
 namespace Cw3.Services
@@ -28,7 +29,6 @@ namespace Cw3.Services
 
                 try
                 {
-                    //1. Spr czy istnieja studia
                     com.CommandText = "SELECT IdStudy FROM Studies WHERE name=@name";
                     com.Parameters.AddWithValue("name", request.Studies);
                     com.Transaction = tran;
@@ -130,11 +130,9 @@ namespace Cw3.Services
                 com.Parameters.AddWithValue("studies", studies);
                 com.Parameters.AddWithValue("semester", semester);
 
-
                 com.Transaction = tran;
                 var dr = com.ExecuteReader();
                 int idEnrollment;
-
 
                 Enrollment enrollment = new Enrollment();
 
@@ -156,11 +154,36 @@ namespace Cw3.Services
 
                 tran.Commit();
 
-
-
                 return enrollment;
 
             }
+        }
+        public Student GetStudent(string index)
+        {
+            using (var con = new SqlConnection("Data Source=db-mssql;Initial Catalog=s17470;Integrated Security=True"))
+            using (var com = new SqlCommand())
+            {
+                com.Connection = con;
+                con.Open();
+
+                com.CommandText = "SELECT * FROM STUDENT WHERE INDEXNUMBER = @index";
+                com.Parameters.AddWithValue("index", index);
+                var dr = com.ExecuteReader();
+
+                if (!dr.Read())
+                {
+                    dr.Close();
+                    return null;
+                }
+
+                return new Student { FirstName = dr["FirstName"].ToString(), LastName = dr["LastName"].ToString(), IndexNumber = dr["IndexNumber"].ToString() };
+
+            }
+        }
+
+        public IEnumerable<Student> GetStudents()
+        {
+            return null;
         }
     }
 }

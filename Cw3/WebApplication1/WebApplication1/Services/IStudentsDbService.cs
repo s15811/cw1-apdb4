@@ -11,5 +11,7 @@ namespace Cw3.Services
     {
         Enrollment EnrollStudent(EnrollStudentRequest request);
         Enrollment PromoteStudents(int semester, string studies);
+        public IEnumerable<Student> GetStudents();
+        public Student GetStudent(string index);
     }
 }
