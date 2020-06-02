@@ -1,4 +1,5 @@
 ﻿using Cw3.DTOs.Requests;
+using Cw3.DTOs.Responses;
 using Cw3.Models;
 using System;
 using System.Collections.Generic;
@@ -13,5 +14,9 @@ namespace Cw3.Services
         Enrollment PromoteStudents(int semester, string studies);
         public IEnumerable<Student> GetStudents();
         public Student GetStudent(string index);
+        bool CheckIndex(string indexNumber);
+        LoginResponse LoginStudentResponse(LoginRequest request);
+        SaveRefreshTokenResponse SaveRefreshToken(SaveRefreshTokenRequest request);
+        RefreshTokenResponse RefreshToken(RefreshTokenRequest request);
     }
 }

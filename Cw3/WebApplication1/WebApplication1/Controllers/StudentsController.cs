@@ -7,6 +7,17 @@ using Microsoft.AspNetCore.Mvc;
 using Cw3.Models;
 using Cw3.DAL;
 using System.Data.SqlClient;
+using Cw3.DTOs.Requests;
+using System.Security.Claims;
+using System.Text;
+using Microsoft.Extensions.Configuration.Ini;
+using Microsoft.Extensions.Configuration;
+
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using Cw3.Services;
+using Microsoft.AspNetCore.Cryptography.KeyDerivation;
 
 namespace Cw3.Controllers
 {
@@ -14,13 +25,16 @@ namespace Cw3.Controllers
     [ApiController]
     public class StudentsController : ControllerBase
     {
-        private readonly IDbService _dbService;
+        private readonly IStudentsDbService _dbService;
         public static List<Student> _students;
         public static List<Student> _semestry;
 
-        public StudentsController(IDbService dbService)
+        public IConfiguration Configuration { get; set; }
+
+        public StudentsController(IStudentsDbService dbService, IConfiguration configuration)
         {
             _dbService = dbService;
+            Configuration = configuration;
         }
 
         [HttpGet]
@@ -111,8 +125,6 @@ namespace Cw3.Controllers
         [HttpPost]
         public IActionResult CreateStudent(Student student)
         {
-            //... add to database
-            //... generating index number
             student.IndexNumber = $"s{new Random().Next(1, 20000)}";
             return Ok(student);
         }
@@ -159,6 +171,113 @@ namespace Cw3.Controllers
                 }
                 client.Close();
             }
+        }
+
+        [HttpPost]
+        public IActionResult Login(LoginRequest request)
+        {
+            var response = _dbService.LoginStudentResponse(request);
+            if (Validate(request.Haslo, response.Salt, response.Password))
+            {
+                var claims = new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, request.Index),
+                    new Claim(ClaimTypes.Name, request.Index),
+                    new Claim(ClaimTypes.Role, "student")
+                };
+
+                var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Configuration["SecretKey"]));
+                var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+                var token = new JwtSecurityToken
+                (
+                    issuer: "Gakko",
+                    audience: "Students",
+                    claims: claims,
+                    expires: DateTime.Now.AddMinutes(10),
+                    signingCredentials: creds
+                );
+
+
+                var tokenData = (new
+                {
+                    accessToken = new JwtSecurityTokenHandler().WriteToken(token),
+                    refreshToken = Guid.NewGuid()
+                });
+
+                var refreshToken = new SaveRefreshTokenRequest();
+                refreshToken.indexNumber = request.Index;
+                refreshToken.refreshToken = tokenData.refreshToken.ToString();
+
+                var saveRefreshTokenResponse = _dbService.SaveRefreshToken(refreshToken);
+
+                return Ok("Poprawnie zalogowano");
+            }
+            else
+            {
+                return Ok("Błąd logowania");
+            }
+        }
+
+        [HttpPost("refresh-token/{token}")]
+        public IActionResult RefreshToken(RefreshTokenRequest refToken)
+        {
+            var response = _dbService.RefreshToken(refToken);
+            if (null == response.IndexNumber)
+            {
+                return Ok(response.Message);
+            }
+
+            var claims = new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, response.IndexNumber),
+                    new Claim(ClaimTypes.Name, response.IndexNumber),
+                    new Claim(ClaimTypes.Role, "student")
+                };
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Configuration["SecretKey"]));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var token = new JwtSecurityToken
+            (
+                issuer: "Gakko",
+                audience: "Students",
+                claims: claims,
+                expires: DateTime.Now.AddMinutes(10),
+                signingCredentials: creds
+            );
+
+
+            var tokenData = (new
+            {
+                accessToken = new JwtSecurityTokenHandler().WriteToken(token),
+                refreshToken = Guid.NewGuid()
+            });
+
+            var newToken = new SaveRefreshTokenRequest();
+            newToken.indexNumber = response.IndexNumber;
+            newToken.refreshToken = tokenData.refreshToken.ToString();
+
+            var saveRefreshTokenResponse = _dbService.SaveRefreshToken(newToken);
+
+
+            return Ok(response.Message + "\n" + "Nowy Refresh Token: " + newToken.refreshToken.ToString());
+        }
+
+        public static bool Validate(string value, string salt, string hash)
+        {
+            return Create(value, salt) == hash;
+        }
+
+        public static string Create(string value, string salt)
+        {
+            var valueBytes = KeyDerivation.Pbkdf2(
+                                password: value,
+                                salt: Encoding.UTF8.GetBytes(salt),
+                                prf: KeyDerivationPrf.HMACSHA512,
+                                iterationCount: 10000,
+                                numBytesRequested: 256 / 8);
+            return Convert.ToBase64String(valueBytes);
         }
     }
 }
